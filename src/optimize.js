@@ -58,7 +58,7 @@ export default function optimize (selector, element, options = {}) {
  * @param  {HTMLElement} element  - [description]
  * @return {string}               - [description]
  */
-function optimizePart (prePart, current, postPart, element) {
+export function optimizePart (prePart, current, postPart, element) {
   if (prePart.length) prePart = `${prePart} `
   if (postPart.length) postPart = ` ${postPart}`
 
@@ -113,6 +113,9 @@ function optimizePart (prePart, current, postPart, element) {
                                 .sort((curr, next) => curr.length - next.length)
     while (names.length) {
       var partial = current.replace(names.shift(), '')
+      if (partial.trim() === '>') {
+        break;
+      }
       var pattern = `${prePart}${partial}${postPart}`
       var matches = document.querySelectorAll(pattern)
       if (matches.length === 1 && matches[0] === element) {
