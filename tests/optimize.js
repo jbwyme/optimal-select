@@ -1,6 +1,8 @@
-import jsdom from 'jsdom';
+import jsdom from 'jsdom-global';
 import { expect } from 'chai';
 import { optimizePart } from '../src/optimize.js';
+
+jsdom();
 
 var fixtures = `
   <div id="container">
@@ -12,12 +14,9 @@ var fixtures = `
       </div>
   </div>
 `
-var document;
-
 describe('test optimize.js', function() {
   beforeEach(function() {
-    document = jsdom.jsdom(fixtures);
-    global.document = document;
+    document.body.innerHTML = fixtures;
   });
 
   describe('optimizePart', function() {
