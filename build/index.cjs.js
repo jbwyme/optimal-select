@@ -1,18 +1,17 @@
 'use strict';
 
-Object.defineProperty(exports, '__esModule', { value: true });
-
 function _interopDefault (ex) { return (ex && (typeof ex === 'object') && 'default' in ex) ? ex['default'] : ex; }
 
 var cssesc = _interopDefault(require('cssesc'));
 
-var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol" ? function (obj) {
+var babelHelpers = {};
+babelHelpers.typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol" ? function (obj) {
   return typeof obj;
 } : function (obj) {
   return obj && typeof Symbol === "function" && obj.constructor === Symbol ? "symbol" : typeof obj;
 };
 
-var slicedToArray = function () {
+babelHelpers.slicedToArray = function () {
   function sliceIterator(arr, i) {
     var _arr = [];
     var _n = true;
@@ -50,9 +49,11 @@ var slicedToArray = function () {
   };
 }();
 
-var toArray = function (arr) {
+babelHelpers.toArray = function (arr) {
   return Array.isArray(arr) ? arr : Array.from(arr);
 };
+
+babelHelpers;
 
 /**
  * # Universal
@@ -178,7 +179,7 @@ function adapt(element, options) {
 
       var _getInstructions = getInstructions(selectors);
 
-      var _getInstructions2 = toArray(_getInstructions);
+      var _getInstructions2 = babelHelpers.toArray(_getInstructions);
 
       var discover = _getInstructions2[0];
 
@@ -228,7 +229,7 @@ function getInstructions(selectors) {
 
     var _selector$split = selector.split(':');
 
-    var _selector$split2 = slicedToArray(_selector$split, 2);
+    var _selector$split2 = babelHelpers.slicedToArray(_selector$split, 2);
 
     var type = _selector$split2[0];
     var pseudo = _selector$split2[1];
@@ -237,149 +238,147 @@ function getInstructions(selectors) {
     var validate = null;
     var instruction = null;
 
-    (function () {
-      switch (true) {
+    switch (true) {
 
-        // child: '>'
-        case />/.test(type):
-          instruction = function checkParent(node) {
-            return function (validate) {
-              return validate(node.parent) && node.parent;
-            };
+      // child: '>'
+      case />/.test(type):
+        instruction = function checkParent(node) {
+          return function (validate) {
+            return validate(node.parent) && node.parent;
           };
-          break;
+        };
+        break;
 
-        // class: '.'
-        case /^\./.test(type):
-          var names = type.substr(1).split('.');
-          validate = function validate(node) {
-            var nodeClassName = node.attribs.class;
-            return nodeClassName && names.every(function (name) {
-              return nodeClassName.indexOf(name) > -1;
-            });
-          };
-          instruction = function checkClass(node, root) {
-            if (discover) {
-              return node.getElementsByClassName(names.join(' '));
+      // class: '.'
+      case /^\./.test(type):
+        var names = type.substr(1).split('.');
+        validate = function validate(node) {
+          var nodeClassName = node.attribs.class;
+          return nodeClassName && names.every(function (name) {
+            return nodeClassName.indexOf(name) > -1;
+          });
+        };
+        instruction = function checkClass(node, root) {
+          if (discover) {
+            return node.getElementsByClassName(names.join(' '));
+          }
+          return typeof node === 'function' ? node(validate) : getAncestor(node, root, validate);
+        };
+        break;
+
+      // attribute: '[key="value"]'
+      case /^\[/.test(type):
+        var _type$replace$split = type.replace(/\[|\]|"/g, '').split('=');
+
+        var _type$replace$split2 = babelHelpers.slicedToArray(_type$replace$split, 2);
+
+        var attributeKey = _type$replace$split2[0];
+        var attributeValue = _type$replace$split2[1];
+
+        validate = function validate(node) {
+          var hasAttribute = Object.keys(node.attribs).indexOf(attributeKey) > -1;
+          if (hasAttribute) {
+            // regard optional attributeValue
+            if (!attributeValue || node.attribs[attributeKey] === attributeValue) {
+              return true;
             }
-            return typeof node === 'function' ? node(validate) : getAncestor(node, root, validate);
-          };
-          break;
+          }
+          return false;
+        };
+        instruction = function checkAttribute(node, root) {
+          if (discover) {
+            var _ret = function () {
+              var NodeList = [];
+              traverseDescendants([node], function (descendant) {
+                if (validate(descendant)) {
+                  NodeList.push(descendant);
+                }
+              });
+              return {
+                v: NodeList
+              };
+            }();
 
-        // attribute: '[key="value"]'
-        case /^\[/.test(type):
-          var _type$replace$split = type.replace(/\[|\]|"/g, '').split('=');
+            if ((typeof _ret === 'undefined' ? 'undefined' : babelHelpers.typeof(_ret)) === "object") return _ret.v;
+          }
+          return typeof node === 'function' ? node(validate) : getAncestor(node, root, validate);
+        };
+        break;
 
-          var _type$replace$split2 = slicedToArray(_type$replace$split, 2);
+      // id: '#'
+      case /^#/.test(type):
+        var id = type.substr(1);
+        validate = function validate(node) {
+          return node.attribs.id === id;
+        };
+        instruction = function checkId(node, root) {
+          if (discover) {
+            var _ret2 = function () {
+              var NodeList = [];
+              traverseDescendants([node], function (descendant, done) {
+                if (validate(descendant)) {
+                  NodeList.push(descendant);
+                  done();
+                }
+              });
+              return {
+                v: NodeList
+              };
+            }();
 
-          var attributeKey = _type$replace$split2[0];
-          var attributeValue = _type$replace$split2[1];
+            if ((typeof _ret2 === 'undefined' ? 'undefined' : babelHelpers.typeof(_ret2)) === "object") return _ret2.v;
+          }
+          return typeof node === 'function' ? node(validate) : getAncestor(node, root, validate);
+        };
+        break;
 
-          validate = function validate(node) {
-            var hasAttribute = Object.keys(node.attribs).indexOf(attributeKey) > -1;
-            if (hasAttribute) {
-              // regard optional attributeValue
-              if (!attributeValue || node.attribs[attributeKey] === attributeValue) {
-                return true;
-              }
-            }
-            return false;
-          };
-          instruction = function checkAttribute(node, root) {
-            if (discover) {
-              var _ret2 = function () {
-                var NodeList = [];
-                traverseDescendants([node], function (descendant) {
-                  if (validate(descendant)) {
-                    NodeList.push(descendant);
-                  }
-                });
-                return {
-                  v: NodeList
-                };
-              }();
+      // universal: '*'
+      case /\*/.test(type):
+        validate = function validate(node) {
+          return true;
+        };
+        instruction = function checkUniversal(node, root) {
+          if (discover) {
+            var _ret3 = function () {
+              var NodeList = [];
+              traverseDescendants([node], function (descendant) {
+                return NodeList.push(descendant);
+              });
+              return {
+                v: NodeList
+              };
+            }();
 
-              if ((typeof _ret2 === 'undefined' ? 'undefined' : _typeof(_ret2)) === "object") return _ret2.v;
-            }
-            return typeof node === 'function' ? node(validate) : getAncestor(node, root, validate);
-          };
-          break;
+            if ((typeof _ret3 === 'undefined' ? 'undefined' : babelHelpers.typeof(_ret3)) === "object") return _ret3.v;
+          }
+          return typeof node === 'function' ? node(validate) : getAncestor(node, root, validate);
+        };
+        break;
 
-        // id: '#'
-        case /^#/.test(type):
-          var id = type.substr(1);
-          validate = function validate(node) {
-            return node.attribs.id === id;
-          };
-          instruction = function checkId(node, root) {
-            if (discover) {
-              var _ret3 = function () {
-                var NodeList = [];
-                traverseDescendants([node], function (descendant, done) {
-                  if (validate(descendant)) {
-                    NodeList.push(descendant);
-                    done();
-                  }
-                });
-                return {
-                  v: NodeList
-                };
-              }();
+      // tag: '...'
+      default:
+        validate = function validate(node) {
+          return node.name === type;
+        };
+        instruction = function checkTag(node, root) {
+          if (discover) {
+            var _ret4 = function () {
+              var NodeList = [];
+              traverseDescendants([node], function (descendant) {
+                if (validate(descendant)) {
+                  NodeList.push(descendant);
+                }
+              });
+              return {
+                v: NodeList
+              };
+            }();
 
-              if ((typeof _ret3 === 'undefined' ? 'undefined' : _typeof(_ret3)) === "object") return _ret3.v;
-            }
-            return typeof node === 'function' ? node(validate) : getAncestor(node, root, validate);
-          };
-          break;
-
-        // universal: '*'
-        case /\*/.test(type):
-          validate = function validate(node) {
-            return true;
-          };
-          instruction = function checkUniversal(node, root) {
-            if (discover) {
-              var _ret4 = function () {
-                var NodeList = [];
-                traverseDescendants([node], function (descendant) {
-                  return NodeList.push(descendant);
-                });
-                return {
-                  v: NodeList
-                };
-              }();
-
-              if ((typeof _ret4 === 'undefined' ? 'undefined' : _typeof(_ret4)) === "object") return _ret4.v;
-            }
-            return typeof node === 'function' ? node(validate) : getAncestor(node, root, validate);
-          };
-          break;
-
-        // tag: '...'
-        default:
-          validate = function validate(node) {
-            return node.name === type;
-          };
-          instruction = function checkTag(node, root) {
-            if (discover) {
-              var _ret5 = function () {
-                var NodeList = [];
-                traverseDescendants([node], function (descendant) {
-                  if (validate(descendant)) {
-                    NodeList.push(descendant);
-                  }
-                });
-                return {
-                  v: NodeList
-                };
-              }();
-
-              if ((typeof _ret5 === 'undefined' ? 'undefined' : _typeof(_ret5)) === "object") return _ret5.v;
-            }
-            return typeof node === 'function' ? node(validate) : getAncestor(node, root, validate);
-          };
-      }
-    })();
+            if ((typeof _ret4 === 'undefined' ? 'undefined' : babelHelpers.typeof(_ret4)) === "object") return _ret4.v;
+          }
+          return typeof node === 'function' ? node(validate) : getAncestor(node, root, validate);
+        };
+    }
 
     if (!pseudo) {
       return instruction;
@@ -930,6 +929,9 @@ function optimizePart(prePart, current, postPart, element) {
     });
     while (names.length) {
       var partial = current.replace(names.shift(), '');
+      if (partial.trim() === '>') {
+        break;
+      }
       var pattern = '' + prePart + partial + postPart;
       var matches = document.querySelectorAll(pattern);
       if (matches.length === 1 && matches[0] === element) {
@@ -985,7 +987,7 @@ function getSingleSelector(element, options) {
     return getSingleSelector(element.parentNode);
   }
   if (element.nodeType !== 1) {
-    throw new Error('Invalid input - only HTMLElements or representations of them are supported! (not "' + (typeof element === 'undefined' ? 'undefined' : _typeof(element)) + '")');
+    throw new Error('Invalid input - only HTMLElements or representations of them are supported! (not "' + (typeof element === 'undefined' ? 'undefined' : babelHelpers.typeof(element)) + '")');
   }
 
   var globalModified = adapt(element, options);
