@@ -518,12 +518,12 @@ function match(node, options) {
   while (element !== document) {
     // global
     if (checkId(element, path, ignore)) break;
-    if (checkClassGlobal(element, path, ignore, options)) break;
+    if (checkClassesGlobal(element, path, ignore, options)) break;
     if (checkAttributeGlobal(element, path, ignore)) break;
     if (checkTagGlobal(element, path, ignore)) break;
 
     // local
-    checkClassLocal(element, path, ignore, options);
+    checkClassesLocal(element, path, ignore, options);
 
     // define only one selector each iteration
     if (path.length === length) {
@@ -534,7 +534,7 @@ function match(node, options) {
     }
 
     if (path.length === length) {
-      checkClassChild(element, path, ignore, options);
+      checkClassesChild(element, path, ignore, options);
     }
     if (path.length === length) {
       checkAttributeChild(element, path, ignore);
@@ -555,41 +555,40 @@ function match(node, options) {
 }
 
 /**
- * [checkClassGlobal description]
+ * [checkClassesGlobal description]
  * @param  {HTMLElement} element - [description]
  * @param  {Array}       path    - [description]
  * @param  {Object}      ignore  - [description]
  * @return {Boolean}             - [description]
  */
-function checkClassGlobal(element, path, ignore, options) {
-  return checkClass(element, path, ignore, document, options);
+function checkClassesGlobal(element, path, ignore, options) {
+  return checkClasses(element, path, ignore, document, options);
 }
 
 /**
- * [checkClassLocal description]
+ * [checkClassesLocal description]
  * @param  {HTMLElement} element - [description]
  * @param  {Array}       path    - [description]
  * @param  {Object}      ignore  - [description]
  * @return {Boolean}             - [description]
  */
-function checkClassLocal(element, path, ignore, options) {
-  return checkClass(element, path, ignore, element.parentNode, options);
+function checkClassesLocal(element, path, ignore, options) {
+  return checkClasses(element, path, ignore, element.parentNode, options);
 }
 
 /**
- * [checkClassChild description]
+ * [checkClassesChild description]
  * @param  {HTMLElement} element - [description]
  * @param  {Array}       path    - [description]
  * @param  {Object}      ignore  - [description]
  * @return {Boolean}             - [description]
  */
-function checkClassChild(element, path, ignore, options) {
-  var className = element.getAttribute('class');
-  if (checkIgnore(ignore.class, className)) {
+function checkClassesChild(element, path, ignore, options) {
+  var classes = _getFilteredClasses(element, ignore);
+  if (!classes.length) {
     return false;
   }
-  var filteredClasses = filteredClassName(className, options);
-  return checkChild(element, path, '.' + filteredClasses.trim().replace(/\s+/g, '.'));
+  return checkChild(element, path, '.' + classes.join('.'));
 }
 
 /**
@@ -622,9 +621,8 @@ function checkAttributeLocal(element, path, ignore) {
  * @return {Boolean}             - [description]
  */
 function checkAttributeChild(element, path, ignore) {
-  var attributes = element.attributes;
-  return Object.keys(attributes).some(function (key) {
-    var attribute = attributes[key];
+  var attributes = _getAttributes(element);
+  return attributes.some(function (attribute) {
     var attributeName = attribute.name;
     var attributeValue = attribute.value;
     if (checkIgnore(ignore.attribute, attributeName, attributeValue, defaultIgnore.attribute)) {
@@ -688,29 +686,52 @@ function checkId(element, path, ignore) {
   return true;
 }
 
+function _getFilteredClasses(element, ignore) {
+  var className = element.className.trim();
+
+  if (!className) {
+    return [];
+  }
+
+  var classes = className.split(' ');
+  if (ignore.class) {
+    classes = classes.filter(function (c) {
+      return !ignore.class(c);
+    });
+  }
+
+  return classes;
+}
+
 /**
- * [checkClass description]
+ * [checkClasses description]
  * @param  {HTMLElement} element - [description]
  * @param  {Array}       path    - [description]
  * @param  {Object}      ignore  - [description]
  * @param  {HTMLElement} parent  - [description]
  * @return {Boolean}             - [description]
  */
-function checkClass(element, path, ignore, parent, options) {
-  var className = element.getAttribute('class');
-  if (checkIgnore(ignore.class, className)) {
+function checkClasses(element, path, ignore, parent, options) {
+  var classes = _getFilteredClasses(element, ignore);
+  if (!classes.length) {
     return false;
   }
-  var filteredClasses = filteredClassName(className, options);
-  var matches = parent.getElementsByClassName(filteredClasses);
+  var matches = parent.getElementsByClassName(classes.join(' '));
   if (matches.length === 1) {
-    var classSelector = filteredClasses.trim().split(' ').map(function (c) {
+    var classSelector = '.' + classes.map(function (c) {
       return cssesc(c, { isIdentifier: true });
     }).join('.');
-    path.unshift('.' + classSelector);
+    path.unshift(classSelector);
     return true;
   }
+
   return false;
+}
+
+function _getAttributes(element) {
+  return Array.from(element.attributes).filter(function (attr) {
+    return !['id', 'class'].includes(attr.name);
+  });
 }
 
 /**
@@ -722,9 +743,8 @@ function checkClass(element, path, ignore, parent, options) {
  * @return {Boolean}             - [description]
  */
 function checkAttribute(element, path, ignore, parent) {
-  var attributes = element.attributes;
-  return Object.keys(attributes).some(function (key) {
-    var attribute = attributes[key];
+  var attributes = _getAttributes(element);
+  return attributes.some(function (attribute) {
     var attributeName = attribute.name;
     var attributeValue = attribute.value;
     if (checkIgnore(ignore.attribute, attributeName, attributeValue, defaultIgnore.attribute)) {
@@ -939,23 +959,6 @@ function optimizePart(prePart, current, postPart, element) {
 }
 
 /**
- * Filter out specific classes from a className
- * @param {String}  className   - [description]
- * @params {Object} options     - [description]
- * @return {string}             - [description]
- */
-function filteredClassName(className) {
-  var options = arguments.length <= 1 || arguments[1] === undefined ? {} : arguments[1];
-
-  var classesToFilter = options.classesToFilter || [];
-  var filteredClasses = className.split(' ').filter(function (c) {
-    return !!c && !c.includes('(') && !classesToFilter.includes(c);
-  });
-  filteredClasses.sort();
-  return filteredClasses.join(' ');
-}
-
-/**
  * Choose action depending on the input (single/multi)
  * @param  {HTMLElement|Array} input   - [description]
  * @param  {Object}            options - [description]
@@ -989,12 +992,6 @@ function getSingleSelector(element, options) {
 
   var selector = match(element, options);
   var optimized = optimize(selector, element, options);
-
-  // debug
-  // console.log(`
-  //   selector: ${selector}
-  //   optimized:${optimized}
-  // `)
 
   if (globalModified) {
     delete global.document;
